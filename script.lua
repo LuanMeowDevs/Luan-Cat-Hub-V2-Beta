@@ -83,15 +83,12 @@ if ({
     [2753915549] = true,
     [4442272183] = true,
     [7449423635] = true,
-    [85211729168715] = true,
-    [79091703265657] = true,
-    [100117331123089] = true,
 })[_PlaceId] then
-    if _PlaceId == 2753915549 or _PlaceId == 85211729168715 then
+    if _PlaceId == 2753915549 then
         World1 = true
-    elseif _PlaceId == 4442272183 or _PlaceId == 79091703265657 then
+    elseif _PlaceId == 4442272183 then
         World2 = true
-    elseif _PlaceId == 7449423635 or _PlaceId == 100117331123089 then
+    elseif _PlaceId == 7449423635 then
         World3 = true
     end
 else
@@ -7096,7 +7093,7 @@ spawn(function()
 end)
 
 if World2 then
-    Blog:AddButton({
+    Tabs.Blog:AddButton({
         Title = 'Teleport To Lab',
         Description = '',
         Callback = function()
@@ -7105,7 +7102,7 @@ if World2 then
     })
 end
 if World3 then
-    Blog:AddButton({
+    Tabs.Blog:AddButton({
         Title = 'Teleport To Lab',
         Description = '',
         Callback = function()
