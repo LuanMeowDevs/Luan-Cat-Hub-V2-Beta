@@ -1,4 +1,4 @@
-local WindUI = (loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/download/2.3.0/main.lua")))();
+local WindUI = (loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")))();
 local Window = WindUI:CreateWindow({
     Title = "🪐Saturn Hub🪐",
     Author = "By 1x1x1x1x1x1 And David Baszucki",
@@ -10092,3 +10092,4 @@ spawn(function()
 		end);
 	end;
 end);
+
