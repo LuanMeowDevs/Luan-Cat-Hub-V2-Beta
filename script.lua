@@ -14194,9 +14194,7 @@ local _DANGER_ZONES = {
 -- Tiki Outpost CFrame (loja de barcos no Sea 3)
 local _TIKI_OUTPOST_BOAT_DEALER = CFrame.new(-16927.451, 9.086, 433.864);
 
--- ===== SAIL SEA (NOVO - CORRIGIDO) =====
--- Estado da maquina: 0=idle, 1=indo pra Tiki, 2=comprando barco, 3=esperando barco spawnar, 4=indo ate o barco, 5=montando, 6=navegando
-_G._SailSeaState = 0;
+-- ===== SAIL SEA (CORRIGIDO) =====
 _G._SailSeaActive = false;
 _G._SailSeaBoatRef = nil;
 
@@ -14209,33 +14207,26 @@ AutoSailBoatToggle = SeaEventTab:AddToggle({
 		_G._SailSeaActive = state;
 		_G.SailBoats = state;
 		if not state then
-			_G._SailSeaState = 0;
 			_G._SailSeaBoatRef = nil;
-		else
-			_G._SailSeaState = 1; -- começa do passo 1
 		end;
 		(getgenv()).SaveSetting();
 	end
 });
 
 task.spawn(function()
-	-- Funcao auxiliar: acha o barco do player pelo nome
 	local function FindMyBoat(boatName, plrName)
 		for _, b in pairs(workspace.Boats:GetChildren()) do
 			if b.Name == boatName then
 				local own = b:FindFirstChild("OwnerName") or b:FindFirstChild("Owner");
-				if own and own.Value == plrName then
-					return b;
-				end;
+				if own and own.Value == plrName then return b; end;
 			end;
 		end;
 		return nil;
 	end;
 
 	while true do
-		task.wait(0.3);
+		task.wait(0.5);
 		if not _G._SailSeaActive then continue; end;
-
 		pcall(function()
 			local plr = game.Players.LocalPlayer;
 			local char = plr.Character;
@@ -14248,94 +14239,58 @@ task.spawn(function()
 			local plrName = plr.Name;
 			local zoneCF = _DANGER_ZONES[_G.DangerSc or "Lv 1"] or _DANGER_ZONES["Lv 1"];
 
-			-- PASSO 1: Verifica se ja tem barco, pula direto pro passo 4 se tiver
-			if _G._SailSeaState == 1 then
-				local existingBoat = FindMyBoat(selectedBoat, plrName);
-				if existingBoat then
-					_G._SailSeaBoatRef = existingBoat;
-					_G._SailSeaState = 4; -- ja tem barco, vai montar
-				else
-					_G._SailSeaState = 2; -- nao tem barco, vai comprar
-				end;
-
-			-- PASSO 2: Tween ate Tiki Outpost e compra o barco
-			elseif _G._SailSeaState == 2 then
-				-- Tween ate o NPC de barco em Tiki Outpost
+			-- ETAPA 1: Acha ou compra o barco
+			local boat = FindMyBoat(selectedBoat, plrName);
+			if not boat then
+				_G._SailSeaBoatRef = nil;
+				-- Tween ate o NPC de barco de Tiki Outpost
 				TweenPlayer(_BOAT_DEALER_CF);
-				-- Espera chegar (ate 20s)
-				local timer = 0;
-				repeat
-					task.wait(0.2);
-					timer = timer + 0.2;
-				until (hrp.Position - _BOAT_DEALER_CF.Position).Magnitude < 20 or timer > 20;
-				task.wait(0.4);
-				-- Compra o barco via remote
-				game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("BuyBoat", selectedBoat);
+				local t = 0;
+				repeat task.wait(0.25); t = t + 0.25;
+				until (hrp.Position - _BOAT_DEALER_CF.Position).Magnitude < 18 or t > 22;
 				task.wait(0.5);
-				_G._SailSeaState = 3; -- aguarda spawnar
+				-- Compra o barco
+				game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("BuyBoat", selectedBoat);
+				-- Aguarda o barco spawnar com o owner correto (ate 10s)
+				local sw = 0;
+				repeat
+					task.wait(0.3); sw = sw + 0.3;
+					boat = FindMyBoat(selectedBoat, plrName);
+				until boat or sw > 10;
+				if not boat then return; end; -- nao conseguiu spawnar
+			end;
+			_G._SailSeaBoatRef = boat;
 
-			-- PASSO 3: Aguarda o barco aparecer no workspace com o owner correto
-			elseif _G._SailSeaState == 3 then
-				local found = FindMyBoat(selectedBoat, plrName);
-				if found then
-					_G._SailSeaBoatRef = found;
-					_G._SailSeaState = 4; -- barco encontrado, vai montar
-				end;
-				-- continua tentando no proximo loop (sem timeout aqui, o toggle pode ser desligado)
-
-			-- PASSO 4: Tween o player ate o VehicleSeat do barco
-			elseif _G._SailSeaState == 4 then
-				local boat = _G._SailSeaBoatRef;
-				if not boat or not boat.Parent then
-					-- Barco sumiu, volta pro passo 1
-					_G._SailSeaBoatRef = nil;
-					_G._SailSeaState = 1;
-					return;
-				end;
-				local seat = boat:FindFirstChildWhichIsA("VehicleSeat");
-				if seat then
-					-- Move o hrp direto para o seat
-					hrp.CFrame = seat.CFrame * CFrame.new(0, 2, 0);
-					task.wait(0.5);
-					hrp.CFrame = seat.CFrame * CFrame.new(0, 0.5, 0);
+			-- ETAPA 2: Monta no barco usando MountPlayerToBoat (funcao nativa do script)
+			if not hum.Sit then
+				-- Tenta montar ate 5 vezes
+				for i = 1, 5 do
+					local mounted = MountPlayerToBoat(boat);
+					if mounted or hum.Sit then break; end;
 					task.wait(0.5);
 				end;
-				_G._SailSeaState = 5; -- tenta montar
+				-- Se ainda nao sentou, retorna e tenta de novo no proximo loop
+				if not hum.Sit then return; end;
+			end;
 
-			-- PASSO 5: Confirma que esta sentado, se nao tenta de novo
-			elseif _G._SailSeaState == 5 then
-				if hum.Sit then
-					_G._SailSeaState = 6; -- montado! agora navega
-				else
-					-- Nao montou ainda, volta pro passo 4 para tentar de novo
-					_G._SailSeaState = 4;
-				end;
-
-			-- PASSO 6: Navega ate o mar selecionado, fica la atacando inimigos
-			elseif _G._SailSeaState == 6 then
-				local boat = _G._SailSeaBoatRef;
-				if not boat or not boat.Parent then
-					_G._SailSeaBoatRef = nil;
-					_G._SailSeaState = 1;
-					return;
-				end;
-				-- Se caiu do barco, volta pro passo 4
-				if not hum.Sit then
-					_G._SailSeaState = 4;
-					return;
-				end;
-				-- Tem inimigo perto? Para de navegar e deixa o farm atacar
-				local hasEnemy = pcall(function()
-					return CheckShark() or CheckTerrorShark() or CheckFishCrew()
-						or CheckPiranha() or CheckEnemiesBoat() or CheckSeaBeast()
-						or CheckPirateGrandBrigade() or CheckHauntedCrew() or CheckLeviathan();
-				end);
-				if hasEnemy then return; end;
-				-- Navega para a zona selecionada se estiver longe
-				local distToZone = (hrp.Position - zoneCF.Position).Magnitude;
-				if distToZone > 500 then
-					TweenBoat(zoneCF);
-				end;
+			-- ETAPA 3: Esta montado — navega para o mar selecionado
+			-- Verifica se o barco ainda existe
+			if not boat.Parent then
+				_G._SailSeaBoatRef = nil;
+				return;
+			end;
+			-- Se tiver inimigo perto, nao navega (deixa o farm atacar)
+			local hasEnemy = false;
+			pcall(function()
+				hasEnemy = CheckShark() or CheckTerrorShark() or CheckFishCrew()
+					or CheckPiranha() or CheckEnemiesBoat() or CheckSeaBeast()
+					or CheckPirateGrandBrigade() or CheckHauntedCrew() or CheckLeviathan();
+			end);
+			if hasEnemy then return; end;
+			-- Navega via TweenBoat ate a zona selecionada
+			local distToZone = (hrp.Position - zoneCF.Position).Magnitude;
+			if distToZone > 400 then
+				TweenBoat(zoneCF);
 			end;
 		end);
 	end;
