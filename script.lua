@@ -6520,26 +6520,6 @@ spawn(function()
 	end;
 end);
 LevelFarmSection = MainTab:AddSection(" Level Farm");
-	Title = "Discord Server",
-	Desc = "Join discord server to get update info and webhooks!",
-	TextXAlignment = "Left",
-	Buttons = {
-		{
-			Title = "Copy Link",
-			Callback = function()
-				setclipboard("https://discord.gg/f4K5sDwKkn");
-				Library:Notify({
-					Title = "Notification",
-					Content = "Copied",
-					Icon = "bell",
-					Duration = 3
-				});
-			end
-		}
-	}
-});
-
-LevelFarmSection = MainTab:AddSection(" Level Farm");
 
 -- Garante compatibilidade total com o sistema de quests existente
 local function QuestNeta()
